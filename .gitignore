@@ -1,0 +1,46 @@
+# Node / Backend ignores
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# Coverage
+coverage/
+
+# Build artifacts / dist
+.dist/
+dist/
+build/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+.env.test
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Sui / blockchain temp outputs
+sui.log
+.publish
+.move
+Move.lock
+
+# Cache
+.cache/
+.tmp/
+**/.eslintcache
+
