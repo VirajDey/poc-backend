@@ -175,6 +175,49 @@ app.get('/tx/:digest', async (req, res) => {
   }
 });
 
+// --- Gas estimation (devInspect) ---
+app.get('/gas/estimate', async (req, res) => {
+  try {
+    const action = (req.query.action || 'increment').toString();
+    const counterId = (req.query.counterId || process.env.COUNTER_ID || '').toString();
+    if (['increment','reset'].includes(action) && !counterId) {
+      return res.status(400).json({ error: 'counterId required for action '+action });
+    }
+    const sender = signer.getPublicKey().toSuiAddress();
+    const tx = new Transaction();
+    if (action === 'create') {
+      tx.moveCall({ target: `${process.env.PACKAGE_ID}::counter::create`, arguments: [] });
+    } else if (action === 'increment') {
+      tx.moveCall({ target: `${process.env.PACKAGE_ID}::counter::increment`, arguments: [tx.object(counterId)] });
+    } else if (action === 'reset') {
+      tx.moveCall({ target: `${process.env.PACKAGE_ID}::counter::reset`, arguments: [tx.object(counterId)] });
+    } else {
+      return res.status(400).json({ error: 'Unsupported action' });
+    }
+    const referenceGasPrice = await client.getReferenceGasPrice();
+    const inspection = await client.devInspectTransactionBlock({ sender, transactionBlock: tx });
+    const gasUsed = inspection.effects?.gasUsed || {};
+    const computationCost = Number(gasUsed.computationCost || 0);
+    const storageCost = Number(gasUsed.storageCost || 0);
+    const storageRebate = Number(gasUsed.storageRebate || 0);
+    // Formula: you pay computation + storageCost - storageRebate (approx). Add headroom factor.
+    const baseCost = computationCost + storageCost - storageRebate;
+    const headroomMultiplier = 1.25; // 25% buffer
+    const recommendedBudget = Math.ceil(baseCost * headroomMultiplier);
+    res.json({
+      action,
+      counterId: counterId || null,
+      referenceGasPrice,
+      gasUsed: { computationCost, storageCost, storageRebate },
+      baseCost,
+      recommendedBudget,
+      note: 'Set gasBudget >= recommendedBudget. If still insufficient, raise multiplier.'
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Debug: list struct & function names in the counter module
 app.get('/debug/module', async (_req, res) => {
   try {
